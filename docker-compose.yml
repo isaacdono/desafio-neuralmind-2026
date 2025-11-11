@@ -35,10 +35,13 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    command: >
+      sh -c "uv run alembic upgrade head && uv run uvicorn app.main:app --host 0.0.0.0 --port 8000"
     networks:
       - desafio-nm-estagio-verao-2026-network
     volumes:
       - ./backend/.env:/app/.env:ro
+      
     
   frontend:
     build:
