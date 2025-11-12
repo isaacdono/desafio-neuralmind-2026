@@ -16,6 +16,9 @@ dependencies = [
     "python-jose>=3.5.0",
     "alembic>=1.17.1",
     "asyncpg>=0.30.0",
+    "llama-index-core>=0.14.8",
+    "load-dotenv>=0.1.0",
+    "llama-index-embeddings-cohere>=0.6.1",
 ]
 
 [dependency-groups]

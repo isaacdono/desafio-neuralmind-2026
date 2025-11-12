@@ -41,6 +41,8 @@ services:
       - desafio-nm-estagio-verao-2026-network
     volumes:
       - ./backend/.env:/app/.env:ro
+      - ./backend/data:/app/data:ro
+      - ./backend/storage:/app/storage
       
     
   frontend:

@@ -15,10 +15,22 @@ from app.repositories.ai import save_chat
 from app.schemas.ai import ClientMessage
 
 
+SYSTEM_PROMPT = """Você é um assistente especialista no edital do Vestibular Unicamp 2026.
+Sua missão é responder perguntas sobre o vestibular usando *apenas* o edital.
+
+REGRAS ESTABELECIDAS:
+1.  Para *qualquer* pergunta sobre o vestibular (datas, regras, inscrições, etc.), você DEVE obrigatoriamente usar a ferramenta `search_edital`.
+2.  Se a resposta não estiver nos trechos fornecidos, responda: "Não encontrei essa informação específica no edital."
+3.  Seja conciso e direto ao ponto.
+"""
+
+
 def convert_to_openai_messages(
     messages: List[ClientMessage],
 ) -> List[ChatCompletionMessageParam]:
-    openai_messages = []
+    openai_messages: List[ChatCompletionMessageParam] = [
+        {"role": "system", "content": SYSTEM_PROMPT}
+    ]
 
     for message in messages:
         message_parts: List[dict] = []
@@ -176,7 +188,7 @@ def stream_text(
             messages=messages,
             model=model,
             stream=True,
-            # tools=tool_definitions,
+            tools=tool_definitions,
         )
 
         for chunk in stream:
