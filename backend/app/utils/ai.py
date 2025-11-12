@@ -15,6 +15,11 @@ from app.repositories.ai import save_chat
 from app.schemas.ai import ClientMessage
 
 
+# Adiciona uma configuração básica de logging para ver a saída no console
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
 SYSTEM_PROMPT = """Você é um assistente especialista no edital do Vestibular Unicamp 2026.
 Sua missão é responder perguntas sobre o vestibular usando *apenas* o edital.
 
@@ -170,6 +175,10 @@ def stream_text(
 ):
     """Yield Server-Sent Events for a streaming chat completion."""
     try:
+        logger.info("--- Chamada para API OpenAI (1ª) ---")
+        logger.info(f"MODEL: {model}")
+        logger.info(f"MESSAGES: {json.dumps(list(messages), indent=2, ensure_ascii=False)}")
+        logger.info("------------------------------------")
 
         def format_sse(payload: dict) -> str:
             return f"data: {json.dumps(payload, separators=(',', ':'))}\n\n"
@@ -292,79 +301,96 @@ def stream_text(
             text_finished = True
 
         if finish_reason == "tool_calls":
+            # Append the assistant's tool-calling message
+            assistant_message = {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [
+                    {
+                        "id": state["id"],
+                        "type": "function",
+                        "function": {"name": state["name"], "arguments": state["arguments"]},
+                    }
+                    for state in tool_calls_state.values()
+                ],
+            }
+            messages = list(messages)  # Convert sequence to list to append
+            messages.append(assistant_message)
+
+            # Execute tools and gather results
             for index in sorted(tool_calls_state.keys()):
                 state = tool_calls_state[index]
                 tool_call_id = state.get("id")
                 tool_name = state.get("name")
-
-                if tool_call_id is None or tool_name is None:
-                    continue
-
-                if not state["started"]:
-                    yield format_sse(
-                        {
-                            "type": "tool-input-start",
-                            "toolCallId": tool_call_id,
-                            "toolName": tool_name,
-                        }
-                    )
-                    state["started"] = True
-
                 raw_arguments = state["arguments"]
-                try:
-                    parsed_arguments = (
-                        json.loads(raw_arguments) if raw_arguments else {}
-                    )
-                except Exception as error:
-                    yield format_sse(
-                        {
-                            "type": "tool-input-error",
-                            "toolCallId": tool_call_id,
-                            "toolName": tool_name,
-                            "input": raw_arguments,
-                            "errorText": str(error),
-                        }
-                    )
-                    continue
-
-                yield format_sse(
-                    {
-                        "type": "tool-input-available",
-                        "toolCallId": tool_call_id,
-                        "toolName": tool_name,
-                        "input": parsed_arguments,
-                    }
-                )
-
-                tool_function = available_tools.get(tool_name)
-                if tool_function is None:
-                    yield format_sse(
-                        {
-                            "type": "tool-output-error",
-                            "toolCallId": tool_call_id,
-                            "errorText": f"Tool '{tool_name}' not found.",
-                        }
-                    )
-                    continue
 
                 try:
-                    tool_result = tool_function(**parsed_arguments)
-                except Exception as error:
-                    yield format_sse(
+                    parsed_arguments = json.loads(raw_arguments) if raw_arguments else {}
+                    tool_function = available_tools.get(tool_name)
+                    
+                    if tool_function:
+                        tool_result = tool_function(**parsed_arguments)
+                        messages.append(
+                            {
+                                "role": "tool",
+                                "tool_call_id": tool_call_id,
+                                "content": json.dumps(tool_result),
+                            }
+                        )
+                    else:
+                        messages.append(
+                            {
+                                "role": "tool",
+                                "tool_call_id": tool_call_id,
+                                "content": json.dumps({"error": f"Tool '{tool_name}' not found."}),
+                            }
+                        )
+
+                except Exception as e:
+                    messages.append(
                         {
-                            "type": "tool-output-error",
-                            "toolCallId": tool_call_id,
-                            "errorText": str(error),
+                            "role": "tool",
+                            "tool_call_id": tool_call_id,
+                            "content": json.dumps({"error": str(e)}),
                         }
                     )
-                else:
-                    yield format_sse(
-                        {
-                            "type": "tool-output-available",
-                            "toolCallId": tool_call_id,
-                            "output": tool_result,
-                        }
-                    )
+
+            # Second call to OpenAI with tool results
+            logger.info("--- Chamada para API OpenAI (2ª, com resultado da tool) ---")
+            logger.info(f"MODEL: {model}")
+            logger.info(f"MESSAGES: {json.dumps(list(messages), indent=2, ensure_ascii=False)}")
+            logger.info("----------------------------------------------------------")
+            second_stream = client.chat.completions.create(
+                messages=messages,
+                model=model,
+                stream=True,
+                tools=tool_definitions,
+            )
+
+            for chunk in second_stream:
+                for choice in chunk.choices:
+                    if choice.finish_reason is not None:
+                        finish_reason = choice.finish_reason
+
+                    delta = choice.delta
+                    if delta is None:
+                        continue
+
+                    if delta.content is not None:
+                        if not text_started:
+                            yield format_sse({"type": "text-start", "id": text_stream_id})
+                            text_started = True
+                        yield format_sse(
+                            {
+                                "type": "text-delta",
+                                "id": text_stream_id,
+                                "delta": delta.content,
+                            }
+                        )
+                
+                if not chunk.choices and chunk.usage is not None:
+                    usage_data = chunk.usage
+
 
         if text_started and not text_finished:
             yield format_sse({"type": "text-end", "id": text_stream_id})

@@ -19,6 +19,7 @@ dependencies = [
     "llama-index-core>=0.14.8",
     "load-dotenv>=0.1.0",
     "llama-index-embeddings-cohere>=0.6.1",
+    "pypdf>=6.2.0",
 ]
 
 [dependency-groups]
