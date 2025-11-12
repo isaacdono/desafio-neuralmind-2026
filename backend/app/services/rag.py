@@ -27,7 +27,7 @@ if not os.getenv("COHERE_API_KEY"):
     logger.error("COHERE_API_KEY não encontrada no .env!")
 
 embeddings = CohereEmbeddings(
-    model="embed-english-v3.0", # ou embed-multilingual-v3.0
+    model="embed-v4.0", # ou embed-multilingual-v3.0
     cohere_api_key=os.getenv("COHERE_API_KEY")
 )
 
@@ -110,3 +110,5 @@ def search_edital(query: str) -> str:
     except Exception as e:
         logger.error(f"Erro na busca: {e}", exc_info=True)
         return "Erro interno ao consultar documentos."
+    
+# print(search_edital("Quais são os requisitos para inscrição?"))  # Teste rápido
