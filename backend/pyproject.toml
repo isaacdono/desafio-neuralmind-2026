@@ -16,10 +16,11 @@ dependencies = [
     "python-jose>=3.5.0",
     "alembic>=1.17.1",
     "asyncpg>=0.30.0",
-    "llama-index-core>=0.14.8",
     "load-dotenv>=0.1.0",
-    "llama-index-embeddings-cohere>=0.6.1",
     "pypdf>=6.2.0",
+    "langchain>=1.0.5",
+    "langchain-community>=0.4.1",
+    "langchain-cohere>=0.5.0",
 ]
 
 [dependency-groups]

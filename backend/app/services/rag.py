@@ -1,67 +1,112 @@
-# utils/rag.py
 import os
-from dotenv import load_dotenv
-from pypdf import PdfReader
-from langchain.schema import Document
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.embeddings import CohereEmbeddings
-from langchain.vectorstores import Chroma
+import logging
 
+# LangChain Imports
+from langchain_community.document_loaders import PyPDFLoader
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_community.vectorstores import FAISS
+from langchain_cohere import CohereEmbeddings
+
+from dotenv import load_dotenv
+
+# Carrega variáveis de ambiente
 load_dotenv()
 
+# Configuração de Logging
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
+
+# --- 1. Configuração de Caminhos ---
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.join(SCRIPT_DIR, "..", "..", "data")       # ajuste se necessário
-PERSIST_DIR = os.path.join(SCRIPT_DIR, "..", "..", "storage") # ajuste se necessário
+PERSIST_DIR = os.path.join(SCRIPT_DIR, "..", "..", "storage")
+DATA_DIR = os.path.join(SCRIPT_DIR, "..", "..", "data")
 PDF_PATH = os.path.join(DATA_DIR, "edital_unicamp.pdf")
 
-COHERE_API_KEY = os.getenv("COHERE_API_KEY")
-EMBED_MODEL = "embed-v4.0"
+# --- 2. Configuração do Modelo de Embedding (Cohere) ---
+if not os.getenv("COHERE_API_KEY"):
+    logger.error("COHERE_API_KEY não encontrada no .env!")
 
-# cria/retorna um retriever (carrega ou indexa)
-def _get_retriever():
-    emb = CohereEmbeddings(cohere_api_key=COHERE_API_KEY, model=EMBED_MODEL)
+embeddings = CohereEmbeddings(
+    model="embed-english-v3.0", # ou embed-multilingual-v3.0
+    cohere_api_key=os.getenv("COHERE_API_KEY")
+)
 
-    # se já existe chroma persistido, abre
-    if os.path.exists(PERSIST_DIR) and os.listdir(PERSIST_DIR):
-        db = Chroma(persist_directory=PERSIST_DIR, embedding_function=emb)
-        return db.as_retriever(search_kwargs={"k": 3})
+# --- 3. Carregamento Imediato (Eager Loading) ---
 
-    # caso contrário: extrai com pypdf, chunka e cria índice
-    if not os.path.exists(PDF_PATH):
-        raise FileNotFoundError(f"PDF não encontrado: {PDF_PATH}")
+try:
+    # Verifica se o índice FAISS já existe na pasta storage
+    # O FAISS salva arquivos como index.faiss e index.pkl
+    if not os.path.exists(os.path.join(PERSIST_DIR, "index.faiss")):
+        logger.info("Índice FAISS não encontrado. Criando novo...")
+        
+        # 1. Carregar o PDF
+        if os.path.exists(PDF_PATH):
+            logger.info(f"Carregando PDF: {PDF_PATH}")
+            loader = PyPDFLoader(PDF_PATH)
+            raw_documents = loader.load()
+        else:
+            logger.warning(f"PDF não encontrado em {PDF_PATH}. Criando índice vazio.")
+            raw_documents = []
 
-    reader = PdfReader(PDF_PATH)
-    docs = []
-    for i, page in enumerate(reader.pages):
-        text = page.extract_text() or ""
-        if text.strip():
-            docs.append(Document(page_content=text, metadata={"source": "edital_unicamp.pdf", "page": i+1}))
+        if raw_documents:
+            # 2. Quebrar o texto (Chunking)
+            # O LangChain precisa disso explícito, diferente do LlamaIndex
+            text_splitter = RecursiveCharacterTextSplitter(
+                chunk_size=1000,
+                chunk_overlap=200,
+                separators=["\n\n", "\n", " ", ""]
+            )
+            documents = text_splitter.split_documents(raw_documents)
+            logger.info(f"Documento dividido em {len(documents)} pedaços (chunks).")
 
-    if not docs:
-        raise RuntimeError("Nenhum texto extraído do PDF com pypdf.")
+            # 3. Criar Vetores e Indexar (FAISS)
+            vectorstore = FAISS.from_documents(documents, embeddings)
+            
+            # 4. Salvar no disco
+            os.makedirs(PERSIST_DIR, exist_ok=True)
+            vectorstore.save_local(PERSIST_DIR)
+            logger.info(f"Índice salvo em: {PERSIST_DIR}")
+        else:
+            # Cria índice vazio para não quebrar
+            vectorstore = FAISS.from_texts([" "], embeddings)
+            
+    else:
+        logger.info("Carregando índice FAISS existente do disco...")
+        # allow_dangerous_deserialization é necessário para carregar arquivos pickle locais confiáveis
+        vectorstore = FAISS.load_local(
+            PERSIST_DIR, 
+            embeddings, 
+            allow_dangerous_deserialization=True
+        )
 
-    splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=120)
-    chunks = splitter.split_documents(docs)
+    # Cria o "retriever" (o objeto de busca)
+    retriever_instance = vectorstore.as_retriever(search_kwargs={"k": 3})
 
-    db = Chroma.from_documents(chunks, emb, persist_directory=PERSIST_DIR)
-    db.persist()
-    return db.as_retriever(search_kwargs={"k": 3})
+except Exception as e:
+    logger.error(f"Falha crítica ao inicializar RAG com LangChain: {e}", exc_info=True)
+    retriever_instance = None
 
-# função que o ai.py chamará como tool
-def search_edital(query: str) -> dict:
+
+# --- 4. A Ferramenta ---
+def search_edital(query: str) -> str:
     """
-    Recebe { "query": "..."} quando chamado via tool call.
-    Retorna um dict (serializável) com os trechos relevantes.
+    Ferramenta RAG: Busca trechos relevantes no edital usando LangChain.
     """
-    retriever = _get_retriever()
-    docs = retriever.get_relevant_documents(query)
+    if retriever_instance is None:
+        return "Erro: O sistema de busca não foi inicializado."
 
-    # monta resposta compacta e estruturada
-    hits = []
-    for d in docs:
-        md = d.metadata or {}
-        hits.append({"page": md.get("page"), "source": md.get("source"), "text": d.page_content[:200]})
+    try:
+        # O método do LangChain é 'invoke' ou 'get_relevant_documents'
+        nodes = retriever_instance.invoke(query)
+        
+        # Formata a saída (junta o conteúdo das páginas)
+        context_str = "\n\n---\n\n".join([doc.page_content for doc in nodes])
+        
+        if not context_str:
+            return "Nenhuma informação relevante encontrada no edital."
+            
+        return context_str
 
-    context_str = "\n\n---\n\n".join([d.page_content for d in docs])
-    # retorno simples — ai.py transforma em JSON e injeta como tool result
-    return {"query": query, "context": context_str, "hits": hits}
+    except Exception as e:
+        logger.error(f"Erro na busca: {e}", exc_info=True)
+        return "Erro interno ao consultar documentos."
