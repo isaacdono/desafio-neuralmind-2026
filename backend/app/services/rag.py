@@ -6,6 +6,8 @@ from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from langchain_cohere import CohereEmbeddings
+from langchain_classic.retrievers.contextual_compression import ContextualCompressionRetriever
+from langchain_cohere import CohereRerank
 
 from dotenv import load_dotenv
 
@@ -52,7 +54,7 @@ try:
             # 2. Quebrar o texto (Chunking)
             # O LangChain precisa disso explícito, diferente do LlamaIndex
             text_splitter = RecursiveCharacterTextSplitter(
-                chunk_size=1000,
+                chunk_size=800,
                 chunk_overlap=200,
                 separators=["\n\n", "\n", " ", ""]
             )
@@ -79,8 +81,24 @@ try:
             allow_dangerous_deserialization=True
         )
 
-    # Cria o "retriever" (o objeto de busca)
-    retriever_instance = vectorstore.as_retriever(search_kwargs={"k": 3})
+    # Cria o "retriever" (o objeto de busca) com Rerank
+    # 1. Base Retriever: "Rede de Pesca Larga"
+    # Aumentamos k para garantir que o chunk relevante seja capturado.
+    base_retriever = vectorstore.as_retriever(search_kwargs={"k": 20})
+
+    # 2. Compressor: "O Filtro Inteligente"
+    # A Cohere reordena os 20 e pega apenas os top_n mais relevantes.
+    compressor = CohereRerank(
+        cohere_api_key=os.getenv("COHERE_API_KEY"),
+        model="rerank-multilingual-v3.0", # Modelo mais recente e multilíngue
+        top_n=4 
+    )
+
+    # 3. Pipeline Final
+    retriever_instance = ContextualCompressionRetriever(
+        base_compressor=compressor,
+        base_retriever=base_retriever
+    )
 
 except Exception as e:
     logger.error(f"Falha crítica ao inicializar RAG com LangChain: {e}", exc_info=True)
@@ -104,6 +122,8 @@ def search_edital(query: str) -> str:
         
         if not context_str:
             return "Nenhuma informação relevante encontrada no edital."
+        
+        logger.info(f"--- CONTEXTO ENVIADO AO LLM ---\n{context_str}\n-------------------------------")
             
         return context_str
 

@@ -15,18 +15,18 @@ from app.repositories.ai import save_chat
 from app.schemas.ai import ClientMessage
 
 
-# Adiciona uma configuração básica de logging para ver a saída no console
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# # Adiciona uma configuração básica de logging para ver a saída no console
+# logging.basicConfig(level=logging.INFO)
+# logger = logging.getLogger(__name__)
 
 
 SYSTEM_PROMPT = """Você é um assistente especialista no edital do Vestibular Unicamp 2026.
 Sua missão é responder perguntas sobre o vestibular.
 
 REGRAS ESTABELECIDAS:
-1.  Para *qualquer* pergunta sobre o vestibular (datas, regras, inscrições, etc.), você DEVE obrigatoriamente usar a ferramenta `search_edital`.
-2.  Se a resposta não estiver nos trechos fornecidos, responda: "Não encontrei essa informação específica no edital."
-3.  Seja conciso e direto ao ponto.
+1.  Para perguntas sobre o vestibular, use a ferramenta `search_edital`.
+2.  Se não encontrar a resposta, devolva: "Não encontrei essa informação específica no edital."
+3.  Procure ser direto ao ponto.
 """
 
 
@@ -175,10 +175,10 @@ def stream_text(
 ):
     """Yield Server-Sent Events for a streaming chat completion."""
     try:
-        logger.info("--- Chamada para API OpenAI (1ª) ---")
-        logger.info(f"MODEL: {model}")
-        logger.info(f"MESSAGES: {json.dumps(list(messages), indent=2, ensure_ascii=False)}")
-        logger.info("------------------------------------")
+        # logger.info("--- Chamada para API OpenAI (1ª) ---")
+        # logger.info(f"MODEL: {model}")
+        # logger.info(f"MESSAGES: {json.dumps(list(messages), indent=2, ensure_ascii=False)}")
+        # logger.info("------------------------------------")
 
         def format_sse(payload: dict) -> str:
             return f"data: {json.dumps(payload, separators=(',', ':'))}\n\n"
@@ -355,11 +355,11 @@ def stream_text(
                         }
                     )
 
-            # Second call to OpenAI with tool results
-            logger.info("--- Chamada para API OpenAI (2ª, com resultado da tool) ---")
-            logger.info(f"MODEL: {model}")
-            logger.info(f"MESSAGES: {json.dumps(list(messages), indent=2, ensure_ascii=False)}")
-            logger.info("----------------------------------------------------------")
+            # # Second call to OpenAI with tool results
+            # logger.info("--- Chamada para API OpenAI (2ª, com resultado da tool) ---")
+            # logger.info(f"MODEL: {model}")
+            # logger.info(f"MESSAGES: {json.dumps(list(messages), indent=2, ensure_ascii=False)}")
+            # logger.info("----------------------------------------------------------")
             second_stream = client.chat.completions.create(
                 messages=messages,
                 model=model,
