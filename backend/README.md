@@ -48,7 +48,7 @@ Se você não estiver familiarizado com as diferentes tecnologias usadas neste p
 
 3. **Suba o container Docker do banco de dados:**
      ```bash
-     make up-db
+     make up
      ```
 
 4. **Aplique as migrações do banco de dados:**
