@@ -108,27 +108,36 @@ except Exception as e:
 # --- 4. A Ferramenta ---
 def search_edital(query: str) -> str:
     """
-    Ferramenta RAG: Busca trechos relevantes no edital usando LangChain.
+    Busca no edital da Unicamp usando o retriever RAG configurado.
     """
-    if retriever_instance is None:
-        return "Erro: O sistema de busca não foi inicializado."
-
+    logger.info(f"Executando busca RAG para a query: '{query}'")
     try:
-        # O método do LangChain é 'invoke' ou 'get_relevant_documents'
+        # CORREÇÃO: O método padrão para executar um retriever é 'invoke'
         nodes = retriever_instance.invoke(query)
         
-        # Formata a saída (junta o conteúdo das páginas)
-        context_str = "\n\n---\n\n".join([doc.page_content for doc in nodes])
-        
-        if not context_str:
-            return "Nenhuma informação relevante encontrada no edital."
-        
-        logger.info(f"--- CONTEXTO ENVIADO AO LLM ---\n{context_str}\n-------------------------------")
-            
-        return context_str
+        if not nodes:
+            logger.warning(f"Nenhum documento relevante encontrado para a query: '{query}'")
+            return "Nenhuma informação encontrada no edital para esta pergunta."
 
-    except Exception as e:
-        logger.error(f"Erro na busca: {e}", exc_info=True)
-        return "Erro interno ao consultar documentos."
+        # Formata o contexto com metadados da página
+        context_list = []
+        for node in nodes:
+            # PyPDFLoader do LangChain usa a chave 'page' (0-indexed)
+            page_number = node.metadata.get("page", "N/A")
+            # Converte para número de página real (1-indexed) se for um número
+            if isinstance(page_number, int):
+                page_number += 1
+            
+            text = node.page_content.replace("\n", " ")
+            context_list.append(f"[Fonte: Página {page_number}] {text}")
+
+        context_str = "\n\n---\n\n".join(context_list)
+        logger.info(f"Contexto encontrado para a query '{query}':\n{context_str[:500]}...")
+        return context_str
     
+    except Exception as e:
+        logger.error(f"Erro durante a busca RAG para a query '{query}': {e}", exc_info=True)
+        return "Ocorreu um erro ao tentar buscar a informação no edital."
+
+
 # print(search_edital("Quais são os requisitos para inscrição?"))  # Teste rápido
