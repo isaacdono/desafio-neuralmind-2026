@@ -19,18 +19,22 @@ OpenAIClientDep = Annotated[OpenAI, Depends(get_openai_client)]
 # Tool examples: https://github.com/vercel-labs/ai-sdk-preview-python-streaming/blob/main/api/utils/tools.py
 TOOL_DEFINITIONS = [
     {
-        "name": "search_edital",
-        "description": "Busca trechos relevantes do Edital Unicamp 2026. Recebe {\"query\": \"texto de busca\"}.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "query": {"type": "string", "description": "Pergunta ou termo a buscar no edital"}
+        "type": "function",
+        "function": {
+            "name": "search_edital",
+            "description": "Ferramenta RAG: Busca os trechos de texto relevantes no edital.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "A consulta para buscar informações no edital.",
+                    }
+                },
+                "required": ["query"],
             },
-            "required": ["query"],
         },
     }
 ]
 
-AVAILABLE_TOOLS = {
-    "search_edital": search_edital
-}
+AVAILABLE_TOOLS = {"search_edital": search_edital}
