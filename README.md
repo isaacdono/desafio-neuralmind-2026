@@ -30,7 +30,7 @@ O sistema RAG foi desenvolvido para permitir consultas inteligentes ao edital da
 4. **Armazenamento Vetorial**
    - Implementa **FAISS** (Facebook AI Similarity Search) para indexação e busca eficiente
    - Persiste o índice em disco (pasta `storage/`) para reutilização
-   - Carregamento lazy: cria índice apenas se não existir
+   - Eager loading: índice é criado/carregado automaticamente na inicialização do módulo
 
 5. **Busca e Reranking**
    - **Base Retriever**: busca inicial recuperando os 20 chunks mais similares (k=20)
