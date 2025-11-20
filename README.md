@@ -4,6 +4,53 @@ Esse repositório se estrutura em uma VS Code Workspace desenvolvida para realiz
 
 Caso você não esteja familiarizado com o VS Code Workspace, consulte a documentação oficial: [VS Code Workspace](https://code.visualstudio.com/docs/editor/workspaces).
 
+## Sobre Este Projeto
+
+**Nota Importante:** Este projeto veio pré-pronto como base para o desafio. A implementação principal desenvolvida foi um **sistema RAG (Retrieval-Augmented Generation)** no arquivo [`backend/app/services/rag.py`](./backend/app/services/rag.py).
+
+### Implementação do Sistema RAG
+
+O sistema RAG foi desenvolvido para permitir consultas inteligentes ao edital da Unicamp, utilizando técnicas avançadas de recuperação de informação e inteligência artificial. A implementação inclui:
+
+#### Componentes Principais:
+
+1. **Carregamento de Documentos**
+   - Utiliza `PyPDFLoader` do LangChain para processar o edital em formato PDF
+   - Extrai o conteúdo do documento `edital_unicamp.pdf`
+
+2. **Chunking (Divisão de Texto)**
+   - Implementa `RecursiveCharacterTextSplitter` para dividir o documento em pedaços menores
+   - Configuração: chunks de 800 caracteres com overlap de 200 caracteres
+   - Separadores hierárquicos: `\n\n`, `\n`, espaço e caracteres vazios
+
+3. **Embeddings e Vetorização**
+   - Utiliza **Cohere Embeddings** (modelo `embed-v4.0`)
+   - Converte texto em vetores numéricos para busca semântica
+
+4. **Armazenamento Vetorial**
+   - Implementa **FAISS** (Facebook AI Similarity Search) para indexação e busca eficiente
+   - Persiste o índice em disco (pasta `storage/`) para reutilização
+   - Carregamento lazy: cria índice apenas se não existir
+
+5. **Busca e Reranking**
+   - **Base Retriever**: busca inicial recuperando os 20 chunks mais similares (k=20)
+   - **Cohere Rerank**: utiliza modelo `rerank-multilingual-v3.0` para reordenar resultados
+   - **ContextualCompressionRetriever**: pipeline que combina busca ampla + reranking inteligente
+   - Retorna os 4 chunks mais relevantes (top_n=4) após o rerank
+
+6. **Função de Busca**
+   - `search_edital(query: str)`: função principal que executa consultas no edital
+   - Retorna contexto formatado com referências às páginas do documento original
+   - Tratamento de erros e logging detalhado
+
+#### Tecnologias Utilizadas:
+- **LangChain**: framework principal para RAG
+- **Cohere API**: embeddings e reranking
+- **FAISS**: banco de dados vetorial
+- **Python dotenv**: gerenciamento de variáveis de ambiente
+
+Este sistema permite que usuários façam perguntas em linguagem natural sobre o edital e recebam respostas precisas com referências às páginas originais do documento.
+
 ## Pré-requisitos
 
 - [VS Code](https://code.visualstudio.com/) ou algum editor de código compatível com VS Code, como [Cursor](https://www.cursor.com/).
