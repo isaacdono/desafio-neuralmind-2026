@@ -43,10 +43,7 @@ A aplicação é orquestrada via Docker Compose e é a maneira mais fácil de in
 
 ### Execução
 
-1.  **Clone o Repositório:**
-    ```bash
-    git clone [Link do seu repositório]
-    ```
+1.  **Clone o Repositório**
 2.  **Suba os Contêineres:**
     O `docker-compose.yml` inicia os três serviços e gerencia as dependências.
     ```bash
