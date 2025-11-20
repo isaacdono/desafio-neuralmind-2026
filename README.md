@@ -1,6 +1,6 @@
 ## Desafio de Engenharia de IA - Chatbot Vestibular Unicamp 2026
 
-Este repositório é o resultado do desenvolvimento proposto pelo **Desafio Estágio Verão 2026 da NeuralMind**. O desafio consistiu em fazer um chatbot que tira dúvidas sobre o Vestibular da Unicamp 2026 com base no edital oficial.  
+Este repositório é o resultado do desenvolvimento proposto pelo **Desafio Estágio Verão 2026 da NeuralMind**. O desafio consistiu em fazer um chatbot que tira dúvidas sobre o Vestibular da Unicamp 2026 com base no edital oficial, além de realizar o deploy da aplicação.
 
 O esquema inicial contava com um chatbot funcional mas sem a utilização de RAG, o que fazia a LLM não dar respostas adequadas sobre o vestibular. A tarefa era implementar o retrieval e acrescentar a fonte da informação na resposta do chatbot, como uma forma de transparência.  
 
@@ -34,7 +34,7 @@ Desenvolvi a lógica necessária para garantir a comunicação de ida e volta (m
 
 ## Como Rodar o Projeto (Desenvolvimento Local)
 
-A aplicação é orquestrada via Docker Compose e é a maneira mais fácil de iniciar todos os serviços (Postgres, Backend, Frontend).
+A aplicação é orquestrada via Docker Compose e é a maneira mais fácil de iniciar todos os serviços (Postgres, Backend, Frontend). A última parte do desafio, que consistia em fazer o deploy da aplicação, não foi concluída.
 
 ### Pré-requisitos
 
