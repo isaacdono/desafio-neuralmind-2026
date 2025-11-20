@@ -1,64 +1,56 @@
-# Workspace: Desafio Estágio Verão 2026 da NeuralMind
+## Desafio de Engenharia de IA - Chatbot Vestibular Unicamp 2026
 
-Esse repositório se estrutura em uma VS Code Workspace desenvolvida para realizar o Desafio Estágio Verão 2026 da NeuralMind. Recomendamos que você utilize uma workspace unificada para facilitar a navegação entre as pastas e o desenvolvimento do projeto, especialmente considerando que você atuará em dois ambientes distintos: Python e Node.js.
+Este repositório é o resultado do desenvolvimento proposto pelo **Desafio Estágio Verão 2026 da NeuralMind**. O desafio consistiu em fazer um chatbot que tira dúvidas sobre o Vestibular da Unicamp 2026 com base no edital oficial.  
 
-Caso você não esteja familiarizado com o VS Code Workspace, consulte a documentação oficial: [VS Code Workspace](https://code.visualstudio.com/docs/editor/workspaces).
+O esquema inicial contava com um chatbot funcional mas sem a utilização de RAG, o que fazia a LLM não dar respostas adequadas sobre o vestibular. A tarefa era implementar o retrieval e acrescentar a fonte da informação na resposta do chatbot, como uma forma de transparência.  
 
-## Pré-requisitos
+A stack do projeto implementada inicialmente é: backend FastAPI + frontend Next.js.
 
-- [VS Code](https://code.visualstudio.com/) ou algum editor de código compatível com VS Code, como [Cursor](https://www.cursor.com/).
+-----
 
-**Nota:** Cada pasta possui um arquivo `README.md` detalhando seus pré-requisitos e instruções específicas para execução e desenvolvimento naquele módulo. Você também precisará instalar as extensões recomendadas para cada pasta. Verifique o arquivo `.vscode/extensions.json` dentro de cada pasta para mais informações.
+## Contribuições Chave
 
-## Início Rápido
+Minhas contribuições com o auxílio de IA concentraram-se na implementação da lógica de IA, estabilidade do pipeline e otimização de busca.
 
-1. Clone o repositório:
-   ```bash
-   git clone https://github.com/neuralmind-ai/desafio-nm-estagio-de-verao-2026.git
-   ```
-2. Abra a pasta no VS Code.
-3. Abra a paleta de comandos (Ctrl+Shift+P ou Cmd+Shift+P).
-4. Procure por "File: Open Workspace from File..." e execute-o.
-5. Selecione o arquivo `project.code-workspace`.
-6. O workspace será aberto.
+### 1\. Implementação do Motor RAG (Backend)
 
-Em seguida, você pode abrir o terminal no VS Code e executar os comandos para instalar as dependências e iniciar o servidor de desenvolvimento de cada aplicação. Para isso, consulte o arquivo `README.md` de cada pasta.
+O principal trabalho foi integrar uma arquitetura de busca semântica robusta ao sistema de *tool calling* existente na API.
 
-## Estrutura de Pastas
+  * **Ferramenta Desenvolvida (`backend/app/services/rag.py`):** Criei a função `search_edital` que atua como uma ferramenta (tool) para a LLM.
+  * **Pipeline de Busca:** A função orquestra o RAG utilizando **LangChain** para o pipeline, **FAISS** como *Vector Store* local e **Cohere Embeddings** para vetorização.
+  * **Otimização de Precisão:** Para resolver o problema de **"Lost in the Middle"** e falhas de busca em listas/tabelas, foi implementado o padrão **Wide Net + Rerank**, onde o sistema busca amplamente (`k=20`) e usa o **Cohere Rerank** para refinar e enviar apenas os 3 trechos mais precisos ao LLM (`top_n=3`).
+  * **Paginação:** Modificação da função `search_edital` para contar a página em que a resposta foi encontrada e acrescentar no retorno da tool.
 
-```
-desafio-nm-estagio-de-verao-2026/
-├── backend/                     # Backend FastAPI
-├── frontend/                    # Frontend Next.js
-├── project.code-workspace       # Configuração da workspace
-├── docker-compose.yml           # Orquestra todos os serviços para facilitar o desenvolvimento, deploy e/ou testes
-└── README.md                    # Documentação geral do projeto (este README)
-```
+### 2\. Engenharia de Prompts e Ciclo de Vida do Tool
 
-## Documentação
+Desenvolvi a lógica necessária para garantir a comunicação de ida e volta (multi-turn) no ciclo de chamada da ferramenta (Tool Calling).
 
-Consulte os arquivos `README.md` de cada pasta para mais informações sobre o projeto.
+  * **Instrução do Sistema (`SYSTEM_PROMPT`):** O prompt foi configurado com regras rígidas para controlar o comportamento do LLM:
+      * O LLM é instruído a **sempre** usar a ferramenta `search_edital` para perguntas sobre o vestibular.
+      * O LLM é proibido de usar conhecimento prévio e deve responder apenas com base no contexto **retornado pela ferramenta**.
+      * O LLM sempre cita a página em que a resposta foi encontrada como [Fonte: Página X].
 
-### Contêineres Docker
+-----
 
-O projeto inclui um arquivo [`docker-compose.yml`](./docker-compose.yml) na raiz, que orquestra todos os serviços backend, frontend e banco de dados para facilitar o desenvolvimento e o deploy. Basta executar:
+## Como Rodar o Projeto (Desenvolvimento Local)
 
-```bash
-docker compose up --build
-```
+A aplicação é orquestrada via Docker Compose e é a maneira mais fácil de iniciar todos os serviços (Postgres, Backend, Frontend).
 
-Isso subirá todos os serviços integrados. Caso necessário, ajuste as variáveis de ambiente nos arquivos `.env` de cada módulo ou diretamente no `docker-compose.yml` para atender aos requisitos do seu ambiente de produção ou testes.
+### Pré-requisitos
 
-## Capturas de Tela da Base do Projeto
+  * Docker Engine e Docker Compose instalados.
+  * Um arquivo `.env` preenchido na pasta `backend/` com as chaves necessárias (ex: `COHERE_API_KEY`, `JWT_SECRET`).
 
-![Tela de login](docs/assets/sign-in.png)
-![Tela de overview](docs/assets/overview.png)
-![Tela de chat](docs/assets/chatting.png)
+### Execução
 
-## Contato
-
-Para dúvidas, sugestões ou para reportar problemas, entre no nosso Slack [Desafio Estágio Verão 2026 da NeuralMind](https://join.slack.com/t/desafioneural-yqq2158/shared_invite/zt-3hfwk0rit-M~iWNDAh8HQnVqkvuCKbkw) ou entre em contato com [roberto@neuralmind.ai](mailto:roberto@neuralmind.ai) ou [luis.emidio@neuralmind.ai](mailto:luis.emidio@neuralmind.ai).
-
----
-
-[Licença](LICENSE) | [Política de Segurança](SECURITY.md)
+1.  **Clone o Repositório:**
+    ```bash
+    git clone [Link do seu repositório]
+    ```
+2.  **Suba os Contêineres:**
+    O `docker-compose.yml` inicia os três serviços e gerencia as dependências.
+    ```bash
+    docker compose up --build
+    ```
+3.  **Acesse a Aplicação:**
+    Após o *backend* e *frontend* estarem ativos, acesse: `http://localhost:3000`
